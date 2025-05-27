@@ -3,7 +3,6 @@
 
 """Vérification de la conformité d'un serveur de fichier ARBOMUT"""
 
-
 import logging
 import argparse
 from os import scandir, cpu_count
@@ -18,9 +17,11 @@ from datetime import datetime
 
 LONGUEUR_MAXIMALE_FICHIER = 255
 REGEX_DOSSIER_VIDE = compile(r"^[\w ]+-VIDE$")
-REGEX_NIVEAU_1 = compile(r"^([A-Z])\w+$")
-REGEX_NIVEAU_2 = compile(r"^([A-Z])\w+$")
-REGEX_NIVEAU_3 = compile(r"^([A-Z])\w+$")
+REGEX_NIVEAU_1 = compile(r"^[0-9]{2}_[A-Z]{3}_[\w\s-]+$")
+REGEX_NIVEAU_2 = compile(r"^(Z_)?[0-9]{6}_[A-Z]+_\d+_[\w\s-]+$")
+
+
+# REGEX_NIVEAU_3 = compile(r"^([A-Z])\w+$")
 
 
 class SentinelleErreur(Exception):
@@ -28,7 +29,6 @@ class SentinelleErreur(Exception):
 
 
 class Sentinelle:
-
     def __init__(self, chemin_in: Path, chemin_out: Path) -> None:
         """Initialisation de l'objet"""
         self._chemin_in = chemin_in
@@ -41,6 +41,7 @@ class Sentinelle:
         self._trop_long = []
         self._mauvais_nom = []
         self._vide = []
+        self._non_vide = []
         self._hash_map = defaultdict(list)
         self._dupliques = {}
 
@@ -94,15 +95,17 @@ class Sentinelle:
     def _verif_dossier_nom(self, dossier: Path):
         """vérifie que le nom d'un dossier est cohérent"""
         niveau = len(dossier.parents) - self._niveau_chemin_in
-        if niveau == 1:
+        if niveau == 1:  # cf note ARBOMUT chap. 4.2
             if not REGEX_NIVEAU_1.match(dossier.name):
                 self._mauvais_nom.append((niveau, str(dossier)))
-        elif niveau == 2:
+        elif niveau == 2:  # cf note ARBOMUT chap. 4.3
             if not REGEX_NIVEAU_2.match(dossier.name):
                 self._mauvais_nom.append((niveau, str(dossier)))
-        elif niveau == 3:
-            if not REGEX_NIVEAU_3.match(dossier.name):
-                self._mauvais_nom.append((niveau, str(dossier)))
+            if len(dossier.name) > 50:
+                self._trop_long.append(dossier.name)
+        # elif niveau == 3:
+        #    if not REGEX_NIVEAU_3.match(dossier.name):
+        #        self._mauvais_nom.append((niveau, str(dossier)))
 
     @staticmethod
     def _is_dossier_non_vide(dossier):
@@ -122,11 +125,13 @@ class Sentinelle:
         return False  # Aucun fichier trouvé dans ce dossier ni ses sous-dossiers
 
     def _verif_dossier_vide(self, dossier: Path):
-        """vérifie qu'un dossier se prétendant vide l'est bien"""
+        """vérifie qu'un dossier se prétendant vide l'est bien (et inversement)"""
         if REGEX_DOSSIER_VIDE.match(str(dossier.name)):
-            print("VIDE ??")
             if self._is_dossier_non_vide(dossier):
                 self._vide.append(dossier)
+        else:
+            if not self._is_dossier_non_vide(dossier):
+                self._non_vide.append(dossier)
 
     def _scanne(self, chemin_racine: Path):
         stack = [chemin_racine]
@@ -181,7 +186,7 @@ class Sentinelle:
         str_date = self._now.strftime("%Y-%m-%d %H%M%S")
         if self._mauvais_nom:
             with open(
-                self._chemin_out / f"{str_date} dossiers_mal_nommés.csv",
+                self._chemin_out / f"{str_date} dossiers mal nommés.csv",
                 "w",
                 newline="",
                 encoding="utf-8",
@@ -194,7 +199,7 @@ class Sentinelle:
         # Export dossiers non vides (qui se font passer pour vide)
         if self._vide:
             with open(
-                self._chemin_out / f"{str_date} dossiers_non_vides.csv",
+                self._chemin_out / f"{str_date} dossiers -VIDE qui ne le sont pas.csv",
                 "w",
                 newline="",
                 encoding="utf-8",
@@ -204,10 +209,23 @@ class Sentinelle:
                 for path in self._vide:
                     w.writerow([path])
 
+        # Export dossiers vides (qui se font passer pour non vide)
+        if self._non_vide:
+            with open(
+                self._chemin_out / f"{str_date} dossiers sans -VIDE qui sont vides.csv",
+                "w",
+                newline="",
+                encoding="utf-8",
+            ) as f:
+                w = writer(f)
+                w.writerow(["chemin"])
+                for path in self._non_vide:
+                    w.writerow([path])
+
         # Export fichiers trop longs
         if self._trop_long:
             with open(
-                self._chemin_out / f"{str_date} fichiers_trop_longs.csv",
+                self._chemin_out / f"{str_date} fichiers trop longs.csv",
                 "w",
                 newline="",
                 encoding="utf-8",
@@ -220,7 +238,7 @@ class Sentinelle:
         # Export doublons (hash -> liste des fichiers)
         if any(len(paths) > 1 for paths in self._hash_map.values()):
             with open(
-                self._chemin_out / f"{str_date} fichiers_doublons.csv",
+                self._chemin_out / f"{str_date} fichiers doublons.csv",
                 "w",
                 newline="",
                 encoding="utf-8",
@@ -235,6 +253,7 @@ class Sentinelle:
         """Fonction principale de la classe"""
         self._scanne(self._chemin_in)
         self._exporte_csv()
+        logging.info("vérification effectuée")
 
 
 if __name__ == "__main__":
