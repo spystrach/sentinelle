@@ -80,8 +80,10 @@ class Sentinelle:
         try:
             hasher = hashlib.blake2b(digest_size=32)
             with open(chemin, "rb") as f:
-                while chunk := f.read(8192):
+                chunk = f.read(8192)
+                while chunk:
                     hasher.update(chunk)
+                    chunk = f.read(8192)
             return hasher.hexdigest(), chemin
         except Exception as e:
             logging.debug(e)
