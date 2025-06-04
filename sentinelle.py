@@ -169,6 +169,8 @@ class Sentinelle:
 
                 except PermissionError:
                     continue
+                except FileNotFoundError:
+                    pass  # bug: si le chemin est trop long, le fichier n'est pas lisible
 
         # Détermination des doublons (attente de tous les hachages si besoin)
         for future in as_completed(futures):
@@ -251,14 +253,21 @@ class Sentinelle:
     def main(self):
         """Fonction principale de la classe"""
         # on fait un scan naïf sur le 1er niveau pour jauger du niveau d'avancement
-        for entry in scandir(self._chemin_in):
-            if entry.is_dir(follow_symlinks=False):
-                logging.info(entry.path)
-                self._scanne(Path(entry))
-            elif entry.is_file(follow_symlinks=False):
-                # pas de fichier autorisé au niveau 1
-                self._mauvais_nom.append((1, str(entry)))
-
+        try:
+            for entry in scandir(self._chemin_in):
+                if entry.is_dir(follow_symlinks=False):
+                    logging.info(entry.path)
+                    self._scanne(Path(entry))
+                elif entry.is_file(follow_symlinks=False):
+                    # pas de fichier autorisé au niveau 1
+                    self._mauvais_nom.append((1, str(entry)))
+        except PermissionError:
+            logging.critical("pas la permission de scanner %s" % self._chemin_in)
+        except FileNotFoundError:
+            # bug: si le chemin est trop long, le fichier/dossier n'est pas lisible
+            logging.critical(
+                "erreur windows, impossible de scanner %s" % self._chemin_in
+            )
         # export des résultats
         self._exporte_csv()
         logging.info("vérification effectuée")
