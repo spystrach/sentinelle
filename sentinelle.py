@@ -124,6 +124,8 @@ class Sentinelle:
                             stack.append(entry.path)
             except PermissionError:
                 pass
+            except FileNotFoundError:
+                pass  # bug: si le chemin est trop long, le fichier n'est pas lisible
         return False  # Aucun fichier trouvé dans ce dossier ni ses sous-dossiers
 
     def _verif_dossier_vide(self, dossier: Path):
@@ -147,11 +149,6 @@ class Sentinelle:
                     # scanne le dossier
                     for entry in scandir(current):
                         entry_path = Path(entry.path)
-                        # logging pour les dossiers de premier niveau
-                        if entry_path.parent == self._chemin_in and entry.is_dir(
-                            follow_symlinks=False
-                        ):
-                            logging.info(entry.path)
 
                         # si le scanné est un dossier, on l'ajoute à la pile des dossiers à scanner
                         if entry.is_dir(follow_symlinks=False):
@@ -178,9 +175,9 @@ class Sentinelle:
             hash_result, path = future.result()
             if hash_result:
                 self._hash_map[hash_result].append(path)
-        self._dupliques = {
-            h: paths for h, paths in self._hash_map.items() if len(paths) > 1
-        }
+        self._dupliques.update(
+            {h: paths for h, paths in self._hash_map.items() if len(paths) > 1}
+        )
 
     def _exporte_csv(self):
         """exporte les résultats dans des fichiers CSV"""
@@ -253,7 +250,16 @@ class Sentinelle:
 
     def main(self):
         """Fonction principale de la classe"""
-        self._scanne(self._chemin_in)
+        # on fait un scan naïf sur le 1er niveau pour jauger du niveau d'avancement
+        for entry in scandir(self._chemin_in):
+            if entry.is_dir(follow_symlinks=False):
+                logging.info(entry.path)
+                self._scanne(Path(entry))
+            elif entry.is_file(follow_symlinks=False):
+                # pas de fichier autorisé au niveau 1
+                self._mauvais_nom.append((1, str(entry)))
+
+        # export des résultats
         self._exporte_csv()
         logging.info("vérification effectuée")
 
