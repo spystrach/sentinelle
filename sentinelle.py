@@ -260,7 +260,7 @@ class Sentinelle:
                     self._scanne(Path(entry))
                 elif entry.is_file(follow_symlinks=False):
                     # pas de fichier autorisé au niveau 1
-                    self._mauvais_nom.append((1, str(entry)))
+                    self._mauvais_nom.append((1, entry.path))
         except PermissionError:
             logging.critical("pas la permission de scanner %s" % self._chemin_in)
         except FileNotFoundError:
@@ -282,7 +282,14 @@ if __name__ == "__main__":
                       Vérificateur ARBOMUT
     """
     print(msg)
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=__doc__, add_help=False)
+    parser._optionals.title = "Argument à fournir"
+    parser.add_argument(
+        "-h", "--help",
+        action="help",
+        default=argparse.SUPPRESS,
+        help="Affiche l'aide",
+    )
     parser.add_argument(
         "-v",
         dest="verbose",
@@ -317,7 +324,7 @@ if __name__ == "__main__":
         level=log_level,
         stream=stdout,
         format="%(levelname)s - %(message)s",
-        force=True,
+        # force=True,
     )
 
     # fonction principale
