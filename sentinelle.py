@@ -19,8 +19,6 @@ LONGUEUR_MAXIMALE_FICHIER = 255
 REGEX_DOSSIER_VIDE = compile(r"^[\w ]+-VIDE$")
 REGEX_NIVEAU_1 = compile(r"^[0-9]{2}_[A-Z]{3}_[\w\s-]+$")
 REGEX_NIVEAU_2 = compile(r"^(Z_)?[0-9]{6}_[A-Z]+_\d+_[\w\s-]+$")
-
-
 # REGEX_NIVEAU_3 = compile(r"^([A-Z])\w+$")
 
 
@@ -104,38 +102,31 @@ class Sentinelle:
             if not REGEX_NIVEAU_2.match(dossier.name):
                 self._mauvais_nom.append((niveau, str(dossier)))
             if len(dossier.name) > 50:
-                self._trop_long.append(dossier.name)
+                self._trop_long.append(str(dossier))
         # elif niveau == 3:
         #    if not REGEX_NIVEAU_3.match(dossier.name):
         #        self._mauvais_nom.append((niveau, str(dossier)))
 
     @staticmethod
-    def _is_dossier_non_vide(dossier):
-        """vérifie qu'un dossier est vide tout fichier"""
-        stack = [dossier]
-        while stack:
-            current = stack.pop(0)
-            try:
-                with scandir(current) as it:
-                    for entry in it:
-                        if entry.is_file(follow_symlinks=False):
-                            return True  # Fichier trouvé, on arrête tout
-                        elif entry.is_dir(follow_symlinks=False):
-                            stack.append(entry.path)
-            except PermissionError:
-                pass
-            except FileNotFoundError:
-                pass  # bug: si le chemin est trop long, le fichier n'est pas lisible
-        return False  # Aucun fichier trouvé dans ce dossier ni ses sous-dossiers
+    def _is_dossier_non_vide(dossier: Path):
+        """vérifie qu'un dossier est vide tout élément"""
+        try:
+            for _ in scandir(dossier):
+                return True
+        except PermissionError:
+            pass
+        except FileNotFoundError:
+            pass  # bug: si le chemin est trop long, le fichier n'est pas lisible
+        return False  # Aucun fichier ou dossier trouvé dans ce dossier ni ses sous-dossiers
 
     def _verif_dossier_vide(self, dossier: Path):
         """vérifie qu'un dossier se prétendant vide l'est bien (et inversement)"""
         if REGEX_DOSSIER_VIDE.match(str(dossier.name)):
             if self._is_dossier_non_vide(dossier):
-                self._vide.append(dossier)
+                self._vide.append(str(dossier))
         else:
             if not self._is_dossier_non_vide(dossier):
-                self._non_vide.append(dossier)
+                self._non_vide.append(str(dossier))
 
     def _scanne(self, chemin_racine: Path):
         stack = [chemin_racine]
@@ -185,14 +176,15 @@ class Sentinelle:
         """exporte les résultats dans des fichiers CSV"""
         # Export dossiers avec noms invalides
         str_date = self._now.strftime("%Y-%m-%d %H%M%S")
+        str_nom = self._chemin_in.stem
         if self._mauvais_nom:
             with open(
-                self._chemin_out / f"{str_date} dossiers mal nommés.csv",
+                self._chemin_out / f"{str_date} {str_nom} dossiers mal nommés.csv",
                 "w",
                 newline="",
-                encoding="utf-8",
+                encoding="cp1252",
             ) as f:
-                w = writer(f)
+                w = writer(f, delimiter=";")
                 w.writerow(["niveau", "chemin"])
                 for niv, path in self._mauvais_nom:
                     w.writerow([niv, path])
@@ -200,12 +192,13 @@ class Sentinelle:
         # Export dossiers non vides (qui se font passer pour vide)
         if self._vide:
             with open(
-                self._chemin_out / f"{str_date} dossiers -VIDE qui ne le sont pas.csv",
+                self._chemin_out
+                / f"{str_date} {str_nom} dossiers -VIDE qui ne le sont pas.csv",
                 "w",
                 newline="",
-                encoding="utf-8",
+                encoding="cp1252",
             ) as f:
-                w = writer(f)
+                w = writer(f, delimiter=";")
                 w.writerow(["chemin"])
                 for path in self._vide:
                     w.writerow([path])
@@ -213,12 +206,13 @@ class Sentinelle:
         # Export dossiers vides (qui se font passer pour non vide)
         if self._non_vide:
             with open(
-                self._chemin_out / f"{str_date} dossiers sans -VIDE qui sont vides.csv",
+                self._chemin_out
+                / f"{str_date} {str_nom} dossiers sans -VIDE qui sont vides.csv",
                 "w",
                 newline="",
-                encoding="utf-8",
+                encoding="cp1252",
             ) as f:
-                w = writer(f)
+                w = writer(f, delimiter=";")
                 w.writerow(["chemin"])
                 for path in self._non_vide:
                     w.writerow([path])
@@ -226,12 +220,12 @@ class Sentinelle:
         # Export fichiers trop longs
         if self._trop_long:
             with open(
-                self._chemin_out / f"{str_date} fichiers trop longs.csv",
+                self._chemin_out / f"{str_date} {str_nom} fichiers trop longs.csv",
                 "w",
                 newline="",
-                encoding="utf-8",
+                encoding="cp1252",
             ) as f:
-                w = writer(f)
+                w = writer(f, delimiter=";")
                 w.writerow(["chemin"])
                 for path in self._trop_long:
                     w.writerow([path])
@@ -239,12 +233,12 @@ class Sentinelle:
         # Export doublons (hash -> liste des fichiers)
         if any(len(paths) > 1 for paths in self._hash_map.values()):
             with open(
-                self._chemin_out / f"{str_date} fichiers doublons.csv",
+                self._chemin_out / f"{str_date} {str_nom} fichiers doublons.csv",
                 "w",
                 newline="",
-                encoding="utf-8",
+                encoding="cp1252",
             ) as f:
-                w = writer(f)
+                w = writer(f, delimiter=";")
                 w.writerow(["hash", "chemins"])
                 for hash_value, paths in self._hash_map.items():
                     if len(paths) > 1:  # doublons seulement
@@ -285,7 +279,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__, add_help=False)
     parser._optionals.title = "Argument à fournir"
     parser.add_argument(
-        "-h", "--help",
+        "-h",
+        "--help",
         action="help",
         default=argparse.SUPPRESS,
         help="Affiche l'aide",
