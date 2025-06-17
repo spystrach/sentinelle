@@ -188,7 +188,8 @@ class Sentinelle:
         str_nom = self._chemin_in.stem
         if self._mauvais_nom:
             with open(
-                self._chemin_out / f"{str_nom} {str_date} dossiers mal nommés.csv",
+                self._chemin_out
+                / f"{str_nom} {str_date} {str_nom} dossiers mal nommés.csv",
                 "w",
                 newline="",
                 encoding="cp1252",
@@ -203,7 +204,7 @@ class Sentinelle:
         if self._vide:
             with open(
                 self._chemin_out
-                / f"{str_nom} {str_date} dossiers -VIDE qui ne le sont pas.csv",
+                / f"{str_nom} {str_date} {str_nom} dossiers -VIDE qui ne le sont pas.csv",
                 "w",
                 newline="",
                 encoding="cp1252",
@@ -218,7 +219,7 @@ class Sentinelle:
         if self._non_vide:
             with open(
                 self._chemin_out
-                / f"{str_nom} {str_date} dossiers sans -VIDE qui sont vides.csv",
+                / f"{str_nom} {str_date} {str_nom} dossiers sans -VIDE qui sont vides.csv",
                 "w",
                 newline="",
                 encoding="cp1252",
@@ -232,7 +233,8 @@ class Sentinelle:
         # Export fichiers trop longs
         if self._trop_long:
             with open(
-                self._chemin_out / f"{str_nom} {str_date} fichiers trop longs.csv",
+                self._chemin_out
+                / f"{str_nom} {str_date} {str_nom} fichiers trop longs.csv",
                 "w",
                 newline="",
                 encoding="cp1252",
@@ -246,7 +248,8 @@ class Sentinelle:
         # Export doublons (hash -> liste des fichiers)
         if any(len(paths) > 1 for paths in self._hash_map.values()):
             with open(
-                self._chemin_out / f"{str_nom} {str_date} fichiers doublons.csv",
+                self._chemin_out
+                / f"{str_nom} {str_date} {str_nom} fichiers doublons.csv",
                 "w",
                 newline="",
                 encoding="cp1252",
